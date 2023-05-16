@@ -49,10 +49,11 @@ class limited_int(object):
 
 def main(argv):
     if len(argv) <= 1:
-        argv = 'clock.py -d 1 -t 12:59:57 -H -S 0 -c grey'.split()
+        argv = 'clock.py -d 1 -t 12:59:57 -T 12:59:59 -H -S 2 -c grey'.split()
     default_time = datetime.datetime.now()
     parser = argparse.ArgumentParser(os.path.splitext(os.path.basename(argv[0]))[0])
     parser.add_argument('-t', '--time', type=datetime.time.fromisoformat, default=default_time)
+    parser.add_argument('-T', '--stoptime', type=datetime.time.fromisoformat, action='append')
     parser.add_argument('-w', '--window', action='store_false', dest='fullscreen')
     parser.add_argument('-d', '--display', type=int, default=0)
     parser.add_argument('-f', '--font')
@@ -71,6 +72,9 @@ def main(argv):
     args = parser.parse_args(argv[1:])
     if isinstance(args.time, datetime.time):
         args.time = datetime.datetime.combine(datetime.datetime.today(), args.time)
+    for i, t in enumerate(args.stoptime):
+        if isinstance(t, datetime.time):
+            args.stoptime[i] = datetime.datetime.combine(datetime.datetime.today(), t)
     pygame.init()
     clock = pygame.time.Clock()
     clock.tick()
@@ -86,6 +90,7 @@ def main(argv):
     speed_coef = 1.1
     chars_size = {}
     redraw = False
+    start_time = False
     pygame.event.post(pygame.event.Event(pygame.VIDEORESIZE, size = screen_size, w = screen_size[0], h = screen_size[1]))
     while True:
         e = pygame.event.poll()
@@ -97,7 +102,7 @@ def main(argv):
             if e.key == pygame.K_ESCAPE:
                 break
             if e.key == pygame.K_SPACE:
-                redraw = not redraw
+                start_time = True
         elif e.type == pygame.MOUSEWHEEL:
             if e.y > 0:
                 speed *= e.y * speed_coef
@@ -173,7 +178,17 @@ def main(argv):
         if redraw:
             dt = clock.tick()
             dt = datetime.timedelta(milliseconds=dt)
-            time += dt * speed
+            new_time = time + dt * speed
+            if start_time:
+                time = new_time
+                start_time = False
+            else:
+                for t in args.stoptime:
+                    if time <= t and new_time >= t:
+                        time = t
+                        break
+                else:
+                    time = new_time
             screen.fill(args.background)
             fake_time = time
             real_time = datetime.datetime.now()
