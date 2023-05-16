@@ -91,45 +91,67 @@ def main(argv):
                 speed /= -e.y * speed_coef
         elif e.type == pygame.VIDEORESIZE:
             screen_size = e.size
-            size = 1
-            over_size = None
-            while True:
-                font = pygame.font.SysFont(args.font, size, args.bold, args.italic)
-                widest_digit = (0, 0)
-                for i in range(10):
-                    w = font.size(str(i))[0]
-                    if w > widest_digit[1]:
-                        widest_digit = (i, w)
-                widest_number = (0, 0)
-                for i in range(100):
-                    t = f'{i:02}'
-                    w = font.size(t)[0]
-                    if w > widest_number[1]:
-                        widest_number = (i, w)
-                chars_size['digit'] = widest_digit[1] if (2 * widest_digit[1] > widest_number[1]) else ((widest_number[1] + 1) // 2)
-                for c in ':.':
-                    chars_size[c] = font.size(c)[0]
-                chars_size[' '] = chars_size['digit']
-                chars_size['width'] = (3*2+args.subseconds)*chars_size['digit'] + 2*chars_size[':'] + (chars_size['.'] if args.subseconds > 0 else 0)
-                chars_size['height'] = font.get_linesize()
-                chars_size['size'] = (chars_size['width'], chars_size['height'])
-                if chars_size['size'] <= screen_size:
-                    under_size = size
-                    if over_size:
-                        used_font = font
-                        used_size = chars_size
+            if True: #args.font != None: # For future implementation of custom 7segment display
+                size = 1
+                over_size = None
+                if args.font != None: # this condition (not the body) can be removed when rendered 7segment font will be implemented
+                    sysfont = not os.path.isfile(args.font)
+                    if sysfont:
+                        font_file = pygame.font.match_font(args.font, args.bold, args.italic)
+                        if font_file != None:
+                            print(f'Using system font {os.path.split(font_file)[-1]}')
+                        else:
+                            print(f'Using default system font {pygame.font.get_default_font()}')
+                    else:
+                        print(f'Using custom font {args.font}')
+                else:
+                    print(f'Using default system font {pygame.font.get_default_font()}')
+                    sysfont = True
+                while True:
+                    if sysfont:
+                        font = pygame.font.SysFont(args.font, size, args.bold, args.italic)
+                    else:
+                        font = pygame.font.Font(args.font, size)
+                        font.bold = args.bold
+                        font.italic = args.italic
+                    widest_digit = (0, 0)
+                    for i in range(10):
+                        w = font.size(str(i))[0]
+                        if w > widest_digit[1]:
+                            widest_digit = (i, w)
+                    widest_number = (0, 0)
+                    for i in range(100):
+                        t = f'{i:02}'
+                        w = font.size(t)[0]
+                        if w > widest_number[1]:
+                            widest_number = (i, w)
+                    chars_size['digit'] = widest_digit[1] if (2 * widest_digit[1] > widest_number[1]) else ((widest_number[1] + 1) // 2)
+                    for c in ':.':
+                        chars_size[c] = font.size(c)[0]
+                    chars_size[' '] = chars_size['digit']
+                    chars_size['width'] = (3*2+args.subseconds)*chars_size['digit'] + 2*chars_size[':'] + (chars_size['.'] if args.subseconds > 0 else 0)
+                    chars_size['height'] = font.get_linesize()
+                    chars_size['size'] = (chars_size['width'], chars_size['height'])
+                    if chars_size['size'] <= screen_size:
+                        under_size = size
+                        if over_size:
+                            used_font = font
+                            used_size = chars_size
+                            if (over_size - under_size) < 2:
+                                break
+                            size = (under_size + over_size) // 2
+                        else:
+                            size *= 2
+                    else:
+                        over_size = size
                         if (over_size - under_size) < 2:
                             break
                         size = (under_size + over_size) // 2
-                    else:
-                        size *= 2
-                else:
-                    over_size = size
-                    if (over_size - under_size) < 2:
-                        break
-                    size = (under_size + over_size) // 2
-            font = used_font
-            chars_size = used_size
+                font = used_font
+                chars_size = used_size
+            else:
+                font = None
+                chars_size = screen_size
             redraw = True
         else:
             pass
