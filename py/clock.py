@@ -36,7 +36,8 @@ class limited_int(object):
         return v
 
 def main(argv):
-    argv = 'clock.py -d 1 -t 12:59:57 -H -S 1'.split()
+    if len(argv) <= 1:
+        argv = 'clock.py -d 1 -t 12:59:57 -H -S 0 -c grey'.split()
     default_time = datetime.datetime.now()
     parser = argparse.ArgumentParser(os.path.splitext(os.path.basename(argv[0]))[0])
     parser.add_argument('-t', '--time', type=datetime.time.fromisoformat, default=default_time)
