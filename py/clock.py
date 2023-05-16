@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import datetime
+import decimal
 import pygame
 from typing import Any
 
@@ -18,9 +19,20 @@ def render_time(time: datetime.datetime, font: pygame.font.Font, chars_size: dic
         text = text[:-6+args.subseconds]
     if not args.zeropadded and text[0] == '0':
         text = ' ' + text[1:]
+    dy = chars_size['height']
     for c in text:
-        surface.blit(font_surface := font.render(c, args.antialias, args.color, args.background), (x, 0))
-        x += chars_size['digit'] if c.isdigit() else chars_size.get(c, font_surface.get_width())
+        font_surface = font.render(c, args.antialias, args.color)
+        dx = chars_size['digit'] if c.isdigit() else chars_size.get(c, font_surface.get_width())
+        char_size = (dx, dy)
+        coor = [x, 0]
+        if c == ':':
+            for i, v in enumerate(coor):
+                if chars_size['colon_offset'][i].as_tuple().exponent == 0:
+                    coor[i] += int(chars_size['colon_offset'][i])
+                else:
+                    coor[i] += int(chars_size['colon_offset'][i] * char_size[i])
+        surface.blit(font_surface, coor)
+        x += dx
     return surface
 
 class limited_int(object):
@@ -54,6 +66,8 @@ def main(argv):
     parser.add_argument('-S', '--subseconds', type=limited_int(0, 6), default=3)
     parser.add_argument('-H', '--halfday', action='store_true')
     parser.add_argument('-z', '--zeropadded', action='store_true')
+    parser.add_argument('--colonx', type=decimal.Decimal, default='0')
+    parser.add_argument('--colony', type=decimal.Decimal, default='0')
     args = parser.parse_args(argv[1:])
     if isinstance(args.time, datetime.time):
         args.time = datetime.datetime.combine(datetime.datetime.today(), args.time)
@@ -149,6 +163,7 @@ def main(argv):
                         size = (under_size + over_size) // 2
                 font = used_font
                 chars_size = used_size
+                chars_size['colon_offset'] = (args.colonx, args.colony)
             else:
                 font = None
                 chars_size = screen_size
