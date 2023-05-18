@@ -1,6 +1,7 @@
 import os
 import sys
 import threading
+import ssl
 import http
 import mimetypes
 import time
@@ -53,10 +54,11 @@ class _HTTPServerProxy(http.server.ThreadingHTTPServer):
         self.context = context
 
 class HTTPServer(object):
-    def __init__(self, interface: str = 'localhost', port: int = 8080, poll_interval: float = 0.5, files = [], **kwargs) -> None:
+    def __init__(self, interface: str = 'localhost', port: int = 8080, poll_interval: float = 0.5, ssl_config = None, files = [], **kwargs) -> None:
         self.server_address = (interface, port)
         self._server_thread = None
         self._server_loop_poll_interval = poll_interval
+        self._ssl_config = ssl_config
         self.files = files
         self.user_args = kwargs
         if not mimetypes.inited:
@@ -65,6 +67,17 @@ class HTTPServer(object):
         if self._server_thread is not None and self._server_thread.is_alive():
             raise RuntimeError('Called run() on already running HTTP server.')
         self._server = _HTTPServerProxy(self, self.server_address, HTTPRequestHandler)
+        if self._ssl_config is not None:
+            self._ssl_context = self._ssl_config.get('context', ssl.create_default_context(purpose = ssl.Purpose.CLIENT_AUTH,
+                                                                                           cafile  = self._ssl_config.get('cafile', None),
+                                                                                           capath  = self._ssl_config.get('capath', None),
+                                                                                           cadata  = self._ssl_config.get('cadata', None)))
+            if 'certfile' in self._ssl_config:
+                self._ssl_context.load_cert_chain(self._ssl_config['certfile'], self._ssl_config.get('keyfile', None), self._ssl_config.get('password', None))
+            self._server.socket = self._ssl_context.wrap_socket(self._server.socket,
+                                                                True,
+                                                                True,
+                                                                self._ssl_config.get('suppress_ragged_eofs', True))
         self._server_thread = threading.Thread(target = self._server.serve_forever, args = (self._server_loop_poll_interval, ))
         self._server_thread.start()
     def stop(self):
@@ -78,11 +91,17 @@ class HTTPServer(object):
 def main(argv): # only for develepment purposes
     print(argv)
     hostName = "localhost"
-    serverPort = 8080
-    files = [('', os.path.join(os.path.split(argv[0])[0], 'control.html'))]
-    server = HTTPServer(hostName, serverPort, files=files)
+    serverPort = 8443
+    base_path = os.path.split(argv[0])[0]
+    ssl_config = {
+        'certfile': os.path.join(base_path, 'cert.pem'),
+        'keyfile' : os.path.join(base_path, 'key.pem'),
+        'password': 'UnRealTimeClock'
+    }
+    files = [('', os.path.join(base_path, 'control.html'))]
+    server = HTTPServer(hostName, serverPort, ssl_config=ssl_config, files=files)
     server.run()
-    print(f'Server started http://{server.server_address[0]}:{server.server_address[1]}')
+    print(f'Server started http{"s" if ssl_config else ""}://{server.server_address[0]}:{server.server_address[1]}')
     try:
         while True:
             time.sleep(1)
